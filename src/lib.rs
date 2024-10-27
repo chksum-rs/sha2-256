@@ -19,7 +19,7 @@
 //!
 //! # Usage
 //!
-//! Use the [`chksum`] function to calcualate digest of file, directory and so on.
+//! Use the [`chksum`] function to calculate digest of file, directory and so on.
 //!
 //! ```rust
 //! # use std::path::Path;
@@ -36,6 +36,30 @@
 //!     "44752f37272e944fd2c913a35342eaccdd1aaf189bae50676b301ab213fc5061"
 //! );
 //! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Asynchronous Runtime
+//!
+//! Use the [`async_chksum`] function to calculate digest of file, directory and so on.
+//!
+//! ```rust
+//! # #[cfg(feature = "async-runtime-tokio")]
+//! # {
+//! # use std::path::Path;
+//! # use chksum_sha2_256::Result;
+//! use chksum_sha2_256 as sha2_256;
+//! use tokio::fs::File;
+//!
+//! # async fn wrapper(path: &Path) -> Result<()> {
+//! let file = File::open(path).await?;
+//! let digest = sha2_256::async_chksum(file).await?;
+//! assert_eq!(
+//!     digest.to_hex_lowercase(),
+//!     "44752f37272e944fd2c913a35342eaccdd1aaf189bae50676b301ab213fc5061"
+//! );
+//! # Ok(())
+//! # }
 //! # }
 //! ```
 //!
@@ -231,6 +255,12 @@
 //! cargo add chksum-sha2-256 --features reader,writer
 //! ```
 //!
+//! ## Asynchronous Runtime
+//!
+//! * `async-runtime-tokio`: Enables async interface for Tokio runtime.
+//!
+//! By default, neither of these features is enabled.
+//!
 //! # License
 //!
 //! This crate is licensed under the MIT License.
@@ -246,14 +276,23 @@ pub mod writer;
 use std::fmt::{self, Display, Formatter, LowerHex, UpperHex};
 
 use chksum_core as core;
+#[cfg(feature = "async-runtime-tokio")]
+#[doc(no_inline)]
+pub use chksum_core::AsyncChksumable;
 #[doc(no_inline)]
 pub use chksum_core::{Chksumable, Error, Hash, Hashable, Result};
 #[doc(no_inline)]
 pub use chksum_hash_sha2_256 as hash;
 
+#[cfg(all(feature = "reader", feature = "async-runtime-tokio"))]
+#[doc(inline)]
+pub use crate::reader::AsyncReader;
 #[cfg(feature = "reader")]
 #[doc(inline)]
 pub use crate::reader::Reader;
+#[cfg(all(feature = "writer", feature = "async-runtime-tokio"))]
+#[doc(inline)]
+pub use crate::writer::AsyncWriter;
 #[cfg(feature = "writer")]
 #[doc(inline)]
 pub use crate::writer::Writer;
@@ -333,6 +372,28 @@ pub fn hash(data: impl core::Hashable) -> Digest {
 /// ```
 pub fn chksum(data: impl core::Chksumable) -> Result<Digest> {
     core::chksum::<SHA2_256>(data)
+}
+
+/// Computes the hash of the given input.
+///
+/// # Example
+///
+/// ```rust
+/// use chksum_sha2_256 as sha2_256;
+///
+/// # async fn wrapper() {
+/// let data = b"example data";
+/// if let Ok(digest) = sha2_256::async_chksum(data).await {
+///     assert_eq!(
+///         digest.to_hex_lowercase(),
+///         "44752f37272e944fd2c913a35342eaccdd1aaf189bae50676b301ab213fc5061"
+///     );
+/// }
+/// # }
+/// ```
+#[cfg(feature = "async-runtime-tokio")]
+pub async fn async_chksum(data: impl core::AsyncChksumable) -> Result<Digest> {
+    core::async_chksum::<SHA2_256>(data).await
 }
 
 /// The SHA-2 256 hash instance.
